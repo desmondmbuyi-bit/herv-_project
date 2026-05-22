@@ -11,8 +11,8 @@ st.set_page_config(page_title="Fête Foraine - Billetterie & Entrées", page_ico
 
 # --- INITIALISATION SUPABASE & RESEND ---
 # En production sur Streamlit Cloud, ajoute ces clés dans les "Secrets" de ton application
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://ton-projet.supabase.co")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "ta-cle-api-supabase")
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://gtmvivigmzughlyagzna.supabase.co/rest/v1/")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "sb_publishable_IXHDO2VlfOqPLcjc2RyR3g_PRXWzai9")
 RESEND_API_KEY = st.secrets.get("RESEND_API_KEY", "re_ta_cle_api_resend")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
