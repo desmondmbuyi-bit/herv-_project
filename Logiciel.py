@@ -38,9 +38,9 @@ def generer_et_envoyer_ticket(nom, email, nb_enfants, ages):
         data, count = supabase.table("tickets").insert(nouveau_ticket).execute()
         ticket_id = data[1][0]["id"]
         
-        # 2. Génération du QR Code
-        url_app_streamlit = st.secrets.get("APP_URL", "https://ton-app.streamlit.app")
-        url_scan = f"{url_app_streamlit}/?ticket_id={ticket_id}"
+       # 2. Génération du QR Code pointant vers ton nouveau site Netlify
+        url_netlify_agents = "https://taupe-marigold-b86384.netlify.app"
+        url_scan = f"{url_netlify_agents}/?id={ticket_id}"
         
         qr = qrcode.QRCode(version=1, box_size=10, border=4)
         qr.add_data(url_scan)
