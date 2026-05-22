@@ -10,15 +10,15 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Fête Foraine - Billetterie & Entrées", page_icon="🎡", layout="centered")
 
 # --- INITIALISATION SUPABASE & RESEND ---
-# En production sur Streamlit Cloud, ajoute ces clés dans les "Secrets" de ton application
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://gtmvivigmzughlyagzna.supabase.co/rest/v1/")
+# NETTOYAGE : Suppression du "/rest/v1/" à la fin de l'URL Supabase
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://gtmvivigmzughlyagzna.supabase.co")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "sb_publishable_IXHDO2VlfOqPLcjc2RyR3g_PRXWzai9")
 RESEND_API_KEY = st.secrets.get("RESEND_API_KEY", "re_SZ8dVE1a_E9Eu5pqRP83SULVv7GXeXe9g")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 resend.api_key = RESEND_API_KEY
 
-# Mot de passe pour que n'importe qui ne puisse pas accéder à l'espace agent
+# Mot de passe pour l'espace agent
 MOT_DE_PASSE_AGENT = st.secrets.get("PASSWORD_AGENT", "forain2026")
 
 
@@ -27,7 +27,7 @@ MOT_DE_PASSE_AGENT = st.secrets.get("PASSWORD_AGENT", "forain2026")
 def generer_et_envoyer_ticket(nom, email, nb_enfants, ages):
     """Génère un ticket en BDD, crée le QR code et envoie l'e-mail."""
     try:
-        # 1. Insertion en base de données Supabase (Génère automatiquement un UUID)
+        # 1. Insertion en base de données Supabase
         nouveau_ticket = {
             "nom_acheteur": nom,
             "nb_enfants": nb_enfants,
@@ -38,8 +38,7 @@ def generer_et_envoyer_ticket(nom, email, nb_enfants, ages):
         data, count = supabase.table("tickets").insert(nouveau_ticket).execute()
         ticket_id = data[1][0]["id"]
         
-        # 2. Génération du QR Code contenant l'URL Streamlit avec l'ID du ticket
-        # Remplacera par l'URL finale de ton app Streamlit une fois déployée
+        # 2. Génération du QR Code
         url_app_streamlit = st.secrets.get("APP_URL", "https://ton-app.streamlit.app")
         url_scan = f"{url_app_streamlit}/?ticket_id={ticket_id}"
         
@@ -52,7 +51,7 @@ def generer_et_envoyer_ticket(nom, email, nb_enfants, ages):
         img.save(qr_buffer, format="PNG")
         qr_buffer.seek(0)
         
-        # 3. Envoi du Mail via Resend
+        # 3. Envoi du Mail via Resend (Utilise 'onboarding@resend.dev' si tu n'as pas de domaine validé pour tester)
         html_content = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #333;">
@@ -66,7 +65,7 @@ def generer_et_envoyer_ticket(nom, email, nb_enfants, ages):
         """
         
         resend.Emails.send({
-            "from": "Billetterie Fête Foraine <billetterie@tondomaine.com>",
+            "from": "Billetterie Fête Foraine <onboarding@resend.dev>",
             "to": [email],
             "subject": "🎯 Votre ticket d'entrée Fête Foraine",
             "html": html_content,
@@ -83,7 +82,7 @@ mode = st.sidebar.radio("Choisir l'espace :", ["🛒 Vente & Enregistrement", "�
 
 
 # =====================================================================
-# ESPACE 1 : VENTE ET ENREGISTREMENT (CÔTÉ ADMIN / COMMANDE)
+# ESPACE 1 : VENTE ET ENREGISTREMENT
 # =====================================================================
 if mode == "🛒 Vente & Enregistrement":
     st.title("🎟️ Enregistrement des Entrées")
@@ -117,7 +116,6 @@ if mode == "🛒 Vente & Enregistrement":
 elif mode == "🛡️ Espace Agents (Entrée)":
     st.title("🕵️ Contrôle des Tickets")
     
-    # Sécurisation de l'accès agent
     if "agent_authentifie" not in st.session_state:
         st.session_state.agent_authentifie = False
         
@@ -130,17 +128,15 @@ elif mode == "🛡️ Espace Agents (Entrée)":
             else:
                 st.error("Mot de passe incorrect.")
     else:
-        st.success("Accès Agent Autorisé")
+        st.success("🔒 Mode Agent Actif")
         
-        # --- LOGIQUE DE LECTURE AUTOMATIQUE DU QR CODE VIA URL ---
-        # Si le QR code a été scanné par l'appareil photo du téléphone, il ouvre l'URL avec ?ticket_id=...
+        # Récupération du ticket_id depuis l'URL
         query_params = st.query_params
         ticket_id_scanne = query_params.get("ticket_id", None)
         
         if ticket_id_scanne:
             st.subheader("🔍 Analyse du Ticket Scanné")
             
-            # Recherche du ticket dans Supabase
             res = supabase.table("tickets").select("*").eq("id", ticket_id_scanne).execute()
             
             if not res.data:
@@ -148,7 +144,6 @@ elif mode == "🛡️ Espace Agents (Entrée)":
             else:
                 ticket = res.data[0]
                 
-                # Affichage des informations pour le contrôle d'identité
                 st.markdown(f"### **Acheteur :** {ticket['nom_acheteur']}")
                 st.markdown(f"### **Enfants :** {ticket['nb_enfants']}")
                 st.markdown(f"**Âges enregistrés :** {', '.join(map(str, ticket['ages_enfants'])) if ticket['ages_enfants'] else 'Non spécifiés'}")
@@ -157,37 +152,39 @@ elif mode == "🛡️ Espace Agents (Entrée)":
                     st.success("🟢 TICKET VALIDE - Contrôle d'identité en cours")
                     
                     if st.button("✅ Valider l'entrée et griller le ticket", type="primary"):
-                        # Changement de statut instantané
+                        # Mise à jour dans Supabase
                         supabase.table("tickets").update({
                             "statut": "utilise", 
                             "scanne_le": datetime.utcnow().isoformat()
                         }).eq("id", ticket_id_scanne).execute()
                         
-                        st.success("🎉 Entrée Validée ! Le ticket est maintenant inutilisable.")
-                        # Nettoyage du paramètre d'URL pour le prochain scan
-                        st.query_params.clear()
+                        # Changement d'état propre pour figer l'écran sur le succès
+                        st.balloons()
+                        st.success("🎉 Entrée Validée avec succès ! Le ticket est maintenant inutilisable.")
+                        
+                        # Petit bouton pour passer manuellement au scan suivant sans casser l'affichage du succès
+                        if st.button("➡️ Passer au scan suivant"):
+                            st.query_params.clear()
+                            st.rerun()
                 else:
                     st.error("❌ FRAUDE : Ce ticket a DEJA été utilisé !")
                     date_scan = datetime.fromisoformat(ticket['scanne_le']).strftime("%d/%m/%Y à %H:%M")
                     st.warning(f"Utilisé le : {date_scan}")
                     
-            if st.button("🔄 Prêt pour un nouveau scan"):
+            if st.button("🔄 Annuler / Nouveau scan"):
                 st.query_params.clear()
                 st.rerun()
                 
         else:
-            st.info("Prêt à scanner. Les agents peuvent flasher le QR code directement avec l'appareil photo de leur smartphone. Cela ouvrira automatiquement cette page avec les données du client.")
+            st.info("📱 Prêt à scanner. Flashez le QR code d'un visiteur directement avec l'appareil photo du smartphone pour ouvrir sa fiche.")
             
-            # Optionnel : Ajout d'un lecteur de caméra de secours directement intégré dans la page Streamlit
             st.write("---")
-            st.write("📸 **Alternative : Scanner depuis cette page web**")
-            # Composant HTML léger injecté pour utiliser la caméra si besoin
+            st.write("📸 **Alternative : Scanner directement depuis cet écran**")
             st.components.v1.html("""
             <div id="reader" style="width:100%; max-width:350px; margin:auto;"></div>
             <script src="https://unpkg.com/html5-qrcode"></script>
             <script>
                 function onScanSuccess(decodedText) {
-                    // Redirige l'application Streamlit vers l'URL du ticket
                     window.parent.location.href = decodedText;
                 }
                 let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
