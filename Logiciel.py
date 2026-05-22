@@ -24,7 +24,7 @@ MOT_DE_PASSE_AGENT = st.secrets.get("PASSWORD_AGENT", "forain2026")
 # --- FONCTIONS LOGIQUE DE L'APPLICATION ---
 
 def generer_et_envoyer_ticket_test(nom, email_client, nb_enfants, ages):
-    """Génère le ticket en BDD et l'envoie sur ton mail de test Resend."""
+    """Génère le ticket en BDD et l'envoie STRICTEMENT sur ton mail de test Resend."""
     try:
         # 1. Insertion en base de données Supabase
         nouveau_ticket = {
@@ -50,11 +50,15 @@ def generer_et_envoyer_ticket_test(nom, email_client, nb_enfants, ages):
         img.save(qr_buffer, format="PNG")
         qr_buffer.seek(0)
         
-        # 3. Envoi du Mail via Resend vers ton adresse de test
+        # 3. Préparation du contenu de l'e-mail
+        # On écrit l'adresse du client en gros au début pour ton copier-coller
         html_content = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #333;">
-                <p>⚠️ <strong>INFO TRANSFERT :</strong> Ce ticket est destiné à : <strong>{email_client}</strong></p>
+                <div style="background-color: #fffae6; padding: 15px; border: 1px solid #ffe58f; margin-bottom: 20px;">
+                    📢 <strong>L'ADRESSE DU CLIENT À COPIER POUR LE TRANSFERT :</strong><br>
+                    <span style="font-size: 16px; color: #1890ff; font-weight: bold;">{email_client}</span>
+                </div>
                 <hr>
                 <h2>🎡 Votre billet d'entrée - Fête Foraine !</h2>
                 <p>Bonjour <strong>{nom}</strong>,</p>
@@ -65,12 +69,13 @@ def generer_et_envoyer_ticket_test(nom, email_client, nb_enfants, ages):
         </html>
         """
         
-        # REMPLACE par ton adresse de connexion Resend
-        MON_EMAIL_TEST = "ton-adresse-resend@gmail.com" 
+        # --- CONFIGURATION SÉCURISÉE DES DESTINATAIRES ---
+        # On force l'envoi vers TON adresse enregistrée chez Resend
+        MON_ADRESSE_VALIDE = "desmondmbuyi@gmail.com" 
         
         resend.Emails.send({
             "from": "Billetterie Fête Foraine <onboarding@resend.dev>",
-            "to": [MON_EMAIL_TEST],
+            "to": [MON_ADRESSE_VALIDE],  # ✅ Corrigé ! Resend accepte car c'est TOI.
             "subject": f"🎯 Ticket Fête Foraine - {nom}",
             "html": html_content,
             "attachments": [{"filename": f"ticket_{nom}.png", "content": list(qr_buffer.getvalue())}]
@@ -78,7 +83,6 @@ def generer_et_envoyer_ticket_test(nom, email_client, nb_enfants, ages):
         return True, ticket_id
     except Exception as e:
         return False, str(e)
-
 
 # --- NAVIGATION PRINCIPALE (SIDEBAR) ---
 st.sidebar.title("Menu Navigation")
