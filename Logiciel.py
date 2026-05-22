@@ -131,7 +131,7 @@ elif mode == "📊 Tableau de Bord & Suivi":
 
     with st.spinner("Récupération des données depuis Supabase..."):
         # Requête pour récupérer tous les tickets triés par date de création
-        res = supabase.table("tickets").select("*").order("cree_le", descending=True).execute()
+        res = supabase.table("tickets").select("*").order("cree_le", desc=True).execute()
         
         if not res.data:
             st.info("Aucun ticket n'a encore été enregistré dans la base de données.")
@@ -154,14 +154,20 @@ elif mode == "📊 Tableau de Bord & Suivi":
             st.write("---")
             
             # --- PRÉPARATION DU TABLEAU DE DONNÉES (PANDAS) ---
-            # On transforme les données brutes en un tableau propre pour l'affichage
             liste_propres = []
             for t in tickets:
-                # Formatage des dates pour que ce soit plus lisible
-                date_creation = datetime.fromisoformat(t['cree_le'].replace('Z', '')).strftime("%d/%m/%Y à %H:%M") if t['cree_le'] else "-"
-                date_scan = datetime.fromisoformat(t['scanne_le'].replace('Z', '')).strftime("%d/%m/%Y à %H:%M") if t['scanne_le'] else "Pas encore scanné"
+                # Formatage sécurisé de la date de création
+                try:
+                    date_creation = datetime.fromisoformat(t['cree_le'].replace('Z', '')).strftime("%d/%m/%Y à %H:%M") if t.get('cree_le') else "-"
+                except:
+                    date_creation = str(t.get('cree_le'))
+
+                # Formatage sécurisé de la date de scan
+                try:
+                    date_scan = datetime.fromisoformat(t['scanne_le'].replace('Z', '')).strftime("%d/%m/%Y à %H:%M") if t.get('scanne_le') else "Pas encore scanné"
+                except:
+                    date_scan = str(t.get('scanne_le')) if t.get('scanne_le') else "Pas encore scanné"
                 
-                # Traduction visuelle du statut pour l'utilisateur
                 statut_visuel = "🔴 DEJA ENTRE / UTILISE" if t['statut'] == 'utilise' else "🟢 VALIDE / ATTENDU"
                 
                 liste_propres.append({
@@ -172,8 +178,7 @@ elif mode == "📊 Tableau de Bord & Suivi":
                     "Enregistré le": date_creation,
                     "Scanné le (Entrée)": date_scan,
                     "ID Unique du Ticket": t['id']
-                })
-            
+                })            
             df = pd.DataFrame(liste_propres)
             
             # Affichage du tableau interactif
